@@ -1,3 +1,4 @@
+````Verilog
 CHIP And {
     IN a, b;
     OUT out;
@@ -6,3 +7,4 @@ CHIP And {
     Nand(a=a, b=b, out=nandOut);
     Not(in=nandOut, out=out);
 }
+````
