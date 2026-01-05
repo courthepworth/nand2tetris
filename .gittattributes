@@ -1,0 +1,4 @@
+text
+
+*.hdl linguist-language=Verilog
+*.asm linguist-language=Assembly
