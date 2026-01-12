@@ -1,0 +1,81 @@
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+
+    // Control Mux
+    Mux16(a=false, b=instruction, sel=instruction[15],
+        out[12]=aOrMsel, 
+        out[11]=zxSel,
+        out[10]=nxSel,
+        out[9]=zySel,
+        out[8]=nySel,
+        out[7]=fSel,
+        out[6]=noSel,
+        out[5]=aSel,
+        out[4]=dSel,
+        out[3]=writeM,
+        out[2]=j1lt,
+        out[1]=j2eq,
+        out[0]=j3gt);
+
+    // A-Register Mux
+    Mux16(a=instruction, b=aluOut, sel=instruction[15], out=mux2a);
+    
+    // A-Register load bit logic
+    Not(in=instruction[15], out=notC);
+    Or(a=notC, b=aSel, out=aLoad);
+
+    // A-Register
+    ARegister(in=mux2a, load=aLoad, out=aRegOut, out[0..14]=addressM); 
+
+    // D-Register
+    DRegister(in=aluOut, load=dSel, out=dRegOut); 
+
+    // ALU y-input Mux
+    Mux16(a=aRegOut, b=inM, sel=aOrMsel, out=mux2alu);
+    
+    // ALU
+    ALU(x=dRegOut, y=mux2alu,
+    zx=zxSel, nx=nxSel, zy=zySel, ny=nySel, f=fSel, no=noSel,
+    out=aluOut, out=outM,
+    zr=zrOut, ng=ngOut
+    );
+
+    // PC jump logic
+
+    // Greater than output
+    Not(in=zrOut, out=notZr);
+    Not(in=ngOut, out=notNg);
+    And(a=notZr, b=notNg, out=gt);
+
+    // Compare jjj with ALU bit outputs
+    And(a=j3gt, b=gt, out=GrtTn);
+    And(a=j2eq, b=zrOut, out=zero);
+    And(a=j1lt, b=ngOut, out=LessTn);
+
+    // Mux's
+    Mux(a=false, b=true, sel=GrtTn, out=mux1);
+    Mux(a=true, b=true, sel=GrtTn, out=mux2);
+    
+    Mux(a=true, b=true, sel=GrtTn, out=mux3);
+    Mux(a=true, b=true, sel=GrtTn, out=mux4);
+
+    Mux(a=mux1, b=mux2, sel=zero, out=mux5);
+    Mux(a=mux3, b=mux4, sel=zero, out=mux6);
+    
+    Mux(a=mux5, b=mux6, sel=LessTn, out=pcSel);
+    
+    // Program Counter
+    PC(in=aRegOut, load=pcSel, inc=true, reset=reset, out[0..14]=pc);
+}
