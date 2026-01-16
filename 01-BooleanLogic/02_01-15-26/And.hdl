@@ -1,0 +1,15 @@
+// CREATED FROM SCRATCH ON: 1.15.26
+
+/**
+ * And gate:
+ * if (a and b) out = 1, else out = 0 
+ */
+CHIP And {
+    IN a, b;
+    OUT out;
+    
+    PARTS:
+    // 1.15.26
+    Nand(a=a, b=b, out=nandOut);
+    Not(in=nandOut, out=out);
+}
