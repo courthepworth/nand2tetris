@@ -1,0 +1,97 @@
+/**
+ * The Hack Central Processing unit (CPU).
+ * Parses the binary code in the instruction input and executes it according to the
+ * Hack machine language specification. In the case of a C-instruction, computes the
+ * function specified by the instruction. If the instruction specifies to read a memory
+ * value, the inM input is expected to contain this value. If the instruction specifies
+ * to write a value to the memory, sets the outM output to this value, sets the addressM
+ * output to the target address, and asserts the writeM output (when writeM = 0, any
+ * value may appear in outM).
+ * If the reset input is 0, computes the address of the next instruction and sets the
+ * pc output to that value. If the reset input is 1, sets pc to 0.
+ * Note: The outM and writeM outputs are combinational: they are affected by the
+ * instruction's execution during the current cycle. The addressM and pc outputs are
+ * clocked: although they are affected by the instruction's execution, they commit to
+ * their new values only in the next cycle.
+ */
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+    // Instruction bits
+    Mux16(a=false, b=instruction, sel=instruction[15],
+        out[15]=cCinst,
+        out[12]=cAorM,
+        out[11]=cZx,
+        out[10]=cNx,
+        out[9]=cZy,
+        out[8]=cNy,
+        out[7]=cF,
+        out[6]=cNo,
+        out[5]=cD2, // A
+        out[4]=cD1, // D
+        out[3]=writeM, // M
+        out[2]=cJ2, // LT
+        out[1]=cJ1, // EQ
+        out[0]=cJ0, // GT
+    );    
+
+
+    // Selectors for Inst Mux and A Reg
+    Not(in=cCinst, out=notC);
+    Or(a=cD2, b=notC, out=loadA);
+
+    // Instruction Mux
+    Mux16(a=aluOut, b=instruction, sel=notC,
+        out=muxInst
+    );
+    
+    // AReg
+    ARegister(in=muxInst, load=loadA,
+        out=aRegOut, out[0..14]=addressM
+    );
+
+    // inM and AReg mux
+    Mux16(a=aRegOut, b=inM, sel=cAorM, out=mOrAmux);
+
+    // DReg
+    DRegister(in=aluOut, load=cD1, out=dRegOut);
+
+    // ALU
+    ALU(x=dRegOut, y=mOrAmux,
+        zx=cZx, nx=cNx, zy=cZy, ny=cNy, f=cF, no=cNo,
+        out=aluOut, out=outM, zr=zrOut, ng=ngOut
+    );
+
+    // PC
+    PC(in=aRegOut, load=pcLoad, inc=true, reset=reset,
+        out[0..14]=pc
+    );
+
+    // Jump logic
+    /* zrOut, ngOut,
+    J2 < 0 *JLT*; J1 = 0 *JEQ*; J0 > 0 *JGT*
+    **/
+    
+    And(a=zrOut, b=cJ1, out=and1);
+    And(a=ngOut, b=cJ2, out=and2);
+    Or(a=and1, b=and2, out=or1);
+    Not(in=zrOut, out=notZero);
+    Not(in=ngOut, out=notNeg);
+    And(a=notZero, b=notNeg, out=notZN);
+    And(a=notZN, b=cJ0, out=gtOut);
+    Or(a=or1, b=gtOut, out=pcLoad);
+}
+
+
+
