@@ -1,0 +1,82 @@
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+
+    // Instruction mux
+    Mux16(a=false, b=instruction, sel=instruction[15],
+        out[15]=cToggle,
+        out[12]=cAorM,
+        out[11]=cZx,
+        out[10]=cNx,
+        out[9]=cZy,
+        out[8]=cNy,
+        out[7]=cF,
+        out[6]=cNo,
+        out[5]=cDa,
+        out[4]=cDd,
+        out[3]=writeM,
+        out[2]=cJLT,
+        out[1]=cJEQ,
+        out[0]=cJGT,
+    );
+
+    // Instruction or ALU out mux
+    Not(in=cToggle, out=notCinst);
+    Mux16(a=aluOut, b=instruction, sel=notCinst,
+        out=instMuxOut
+    );
+
+    // A Register
+    Or(a=notCinst, b=cDa, out=loadA);
+    ARegister(in=instMuxOut, load=loadA,
+        out=aRegOut,
+        out[0..14]=addressM,
+    );
+
+    // ALU Mux    
+    Mux16(a=aRegOut, b=inM, sel=cAorM, out=aRegMux);
+
+    // D Register
+    DRegister(in=aluOut, load=cDd, out=dRegMux);
+
+    // ALU
+    ALU(x=dRegMux, y=aRegMux,
+        zx=cZx, nx=cNx, zy=cZy, ny=cNy, f=cF, no=cNo,
+        out=aluOut,
+        out=outM,
+        zr=ZrOut, ng=NgOut
+    );
+
+    // Program Counter
+    PC(in=aRegOut, load=pcLoad, inc=true,
+        reset=reset,
+        out[0..14]=pc
+    );
+
+    // Jump logic
+    // Negate
+    And(a=NgOut, b=cJLT, out=negOut);
+
+    // Equals zero
+    And(a=ZrOut, b=cJEQ, out=zeroOut);
+
+    // Greater than zero
+    Not(in=ZrOut, out=notZero);
+    Not(in=NgOut, out=notNeg);
+    And(a=notZero, b=notNeg, out=znOut);
+    And(a=znOut, b=cJGT, out=greaterOut);
+
+    Or(a=negOut, b=zeroOut, out=or1);
+    Or(a=or1, b=greaterOut, out=pcLoad);
+}
