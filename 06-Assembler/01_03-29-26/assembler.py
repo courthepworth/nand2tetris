@@ -30,8 +30,6 @@ table = {
         'KBD': 24576,
         }
 
-translation = {}
-
 next_mem = 16
 position = 0
 
