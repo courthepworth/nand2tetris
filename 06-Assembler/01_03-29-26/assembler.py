@@ -47,10 +47,8 @@ def clean_line(line):
 def instructionType(line):
     if line[0] == '@':
         return 'A'
-
     elif line[0] == '(' and line[-1] == ')':
         return 'L'
-
     else:
         return 'C'
 
@@ -112,6 +110,7 @@ def jump(value):
             'JLE': '110',
             'JMP': '111'
             }
+
     return f'{table[value]}'
 
 def split_line(line, data):
@@ -139,7 +138,6 @@ with open(file, 'r') as f:
 
         if _type == 'L':
             value = symbol(line)
-            # position += 1
             table[value] = position
 
 with open(output, 'w') as w:
@@ -160,8 +158,6 @@ with open(output, 'w') as w:
             if _type == 'A':
                 value = symbol(line)
                 
-                if value == '32':
-                    print(value, type(value))
                 if value.isdigit():
                     value = int(value)
                     w.write(f'{format(value, '016b')}\n')
